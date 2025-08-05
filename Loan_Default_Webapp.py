@@ -1,3 +1,5 @@
+# Loan Default Prediction App with Hideable Sections and Comments
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -11,100 +13,101 @@ from sklearn.metrics import precision_score, recall_score, f1_score, confusion_m
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# 1. Load Data
+# ---------------------------
+# 1. Load and preprocess data
+# ---------------------------
+
 @st.cache_data
 def load_data():
     df = pd.read_csv("Loan_default.csv")
+    df = df.drop(columns=["LoanID"])  # Drop LoanID as it's non-predictive and causes serialization issues
     return df
 
-# 2. Show Data Overview
+# ----------------------------
+# 2. Data overview UI section
+# ----------------------------
+
 def show_data_overview(df):
-    st.subheader("Data Overview")
-    
-    # Info
-    info_df = pd.DataFrame({
-        'column': df.columns,
-        'non-null count': df.notnull().sum().values,
-        'dtype': df.dtypes.astype(str).values
-    })
-    st.write("**Data Info**")
-    st.dataframe(info_df)
+    with st.expander("📊 Data Overview", expanded=False):
 
-    # Head
-    st.write("**First 5 Rows**")
-    st.write(df.head())
+        st.subheader("Data Info")
+        info_df = pd.DataFrame({
+            'Column': df.columns,
+            'Non-Null Count': df.notnull().sum().values,
+            'Dtype': df.dtypes.astype(str).values
+        })
+        st.dataframe(info_df)
 
-    # Missing values
-    st.write("**Missing Values**")
-    missing = df.isnull().sum()
-    st.write(missing[missing > 0] if missing.sum() else "No missing values.")
+        st.subheader("Sample Rows")
+        st.write(df.head())
 
-    # Summary
-    st.write("**Summary Statistics**")
-    st.write(df.describe(include='all'))
+        st.subheader("Missing Values")
+        missing = df.isnull().sum()
+        st.write(missing[missing > 0] if missing.sum() else "✅ No missing values.")
 
-    # Categorical Distributions
-    st.write("**Categorical Columns**")
-    cat_cols = [c for c in df.select_dtypes(include='object').columns if c != 'LoanID']
-    for i in range(0, len(cat_cols), 3):
-        cols = st.columns(3)
-        for j, col in enumerate(cat_cols[i:i+3]):
-            with cols[j]:
-                st.write(f"**{col}**")
-                st.dataframe(df[col].value_counts())
-                fig, ax = plt.subplots()
-                sns.countplot(data=df, x=col, ax=ax)
-                plt.xticks(rotation=45)
-                st.pyplot(fig)
+        st.subheader("Summary Statistics")
+        st.write(df.describe(include='all'))
 
-    # Numerical Distributions
-    num_cols = df.select_dtypes(include=['int64', 'float64']).columns.drop('Default')
-    
-    st.write("**Histograms**")
-    for i in range(0, len(num_cols), 3):
-        cols = st.columns(3)
-        for j, col in enumerate(num_cols[i:i+3]):
-            with cols[j]:
-                fig, ax = plt.subplots()
-                ax.hist(df[col], bins=30, edgecolor='black')
-                ax.set_title(f"{col}")
-                st.pyplot(fig)
+        # Categorical Columns
+        st.subheader("Categorical Columns Overview")
+        cat_cols = df.select_dtypes(include='object').columns.tolist()
+        for i in range(0, len(cat_cols), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(cat_cols[i:i+3]):
+                with cols[j]:
+                    st.write(f"**{col}**")
+                    st.dataframe(df[col].value_counts())
+                    fig, ax = plt.subplots()
+                    sns.countplot(data=df, x=col, ax=ax)
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
 
-    st.write("**Boxplots**")
-    for i in range(0, len(num_cols), 3):
-        cols = st.columns(3)
-        for j, col in enumerate(num_cols[i:i+3]):
-            with cols[j]:
-                fig, ax = plt.subplots()
-                sns.boxplot(x=df[col], ax=ax)
-                ax.set_title(f"{col}")
-                st.pyplot(fig)
+        # Numerical Columns
+        num_cols = df.select_dtypes(include=['int64', 'float64']).columns.drop('Default')
 
-    st.write("**Violin Plots by Default**")
-    for i in range(0, len(num_cols), 3):
-        cols = st.columns(3)
-        for j, col in enumerate(num_cols[i:i+3]):
-            with cols[j]:
-                fig, ax = plt.subplots()
-                sns.violinplot(x='Default', y=col, data=df, ax=ax)
-                ax.set_title(f"{col}")
-                st.pyplot(fig)
+        st.subheader("Histograms")
+        for i in range(0, len(num_cols), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(num_cols[i:i+3]):
+                with cols[j]:
+                    fig, ax = plt.subplots()
+                    ax.hist(df[col], bins=30, edgecolor='black')
+                    ax.set_title(f"{col}")
+                    st.pyplot(fig)
 
-    # Pairplot
-    st.write("**Pairplot (sample of 5 numeric columns)**")
-    sample_cols = num_cols[:5].tolist() + ['Default']
-    fig = sns.pairplot(df[sample_cols], hue='Default', corner=True)
-    st.pyplot(fig.fig)
+        st.subheader("Boxplots")
+        for i in range(0, len(num_cols), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(num_cols[i:i+3]):
+                with cols[j]:
+                    fig, ax = plt.subplots()
+                    sns.boxplot(x=df[col], ax=ax)
+                    ax.set_title(f"{col}")
+                    st.pyplot(fig)
 
-# 3. Train Models
+        st.subheader("Violin Plots by Default")
+        for i in range(0, len(num_cols), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(num_cols[i:i+3]):
+                with cols[j]:
+                    fig, ax = plt.subplots()
+                    sns.violinplot(x='Default', y=col, data=df, ax=ax)
+                    ax.set_title(f"{col}")
+                    st.pyplot(fig)
+
+# -----------------------------------------
+# 3. Train and evaluate ML models (cached)
+# -----------------------------------------
+
 @st.cache_resource
 def train_models(df):
-    X = df.drop(columns=['LoanID', 'Default'])
-    y = df['Default']
-    
+    X = df.drop(columns=['Default'])  # Input features
+    y = df['Default']                 # Target variable
+
     cat_cols = X.select_dtypes(include='object').columns.tolist()
     num_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
 
+    # Preprocessor to scale numeric and encode categorical data
     preprocessor = ColumnTransformer([
         ('num', StandardScaler(), num_cols),
         ('cat', OneHotEncoder(handle_unknown='ignore'), cat_cols)
@@ -112,7 +115,7 @@ def train_models(df):
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, test_size=0.3, random_state=42)
 
-    # Decision Tree
+    # Decision Tree with GridSearch
     dt_pipe = Pipeline([
         ('pre', preprocessor),
         ('clf', DecisionTreeClassifier(random_state=42))
@@ -148,16 +151,20 @@ def train_models(df):
 
     return grid.best_estimator_, rf_pipe, results, cat_cols, num_cols
 
-# 4. Streamlit App Layout
+# ----------------------------------
+# 4. Streamlit page + user input UI
+# ----------------------------------
+
 st.set_page_config(layout="wide")
-st.title("Loan Default Prediction App (Streamlit Cloud)")
+st.title("🏦 Loan Default Prediction App")
 
 df = load_data()
 show_data_overview(df)
 tree_model, rf_model, results, cat_cols, num_cols = train_models(df)
 
-# 5. Sidebar Input
-st.sidebar.header("Applicant Features")
+# Sidebar input for prediction
+st.sidebar.header("📥 Applicant Features")
+
 def user_input():
     data = {}
     for col in num_cols:
@@ -171,66 +178,78 @@ def user_input():
 
 input_df = user_input()
 
-st.subheader("Input Data")
-st.write(input_df)
+# -----------------------
+# 5. Show Input and Predict
+# -----------------------
 
-# 6. Prediction
-st.sidebar.markdown("---")
-if st.sidebar.button("Predict"):
-    pred = tree_model.predict(input_df)[0]
-    prob = tree_model.predict_proba(input_df)[0][1]
-    result = "Will Default" if pred == 1 else "Will Not Default"
-    st.subheader("Prediction Result")
-    st.success(f"**{result}** with probability: **{prob:.2f}**")
+with st.expander("📌 Prediction", expanded=True):
+    st.subheader("Input Data")
+    st.write(input_df)
 
-# 7. Evaluation
-st.subheader("Model Performance")
-metric_df = pd.DataFrame({
-    model: {
-        'precision': res['precision'],
-        'recall': res['recall'],
-        'f1-score': res['f1']
-    }
-    for model, res in results.items()
-}).T
-st.dataframe(metric_df.style.format("{:.2f}"))
+    if st.sidebar.button("Predict"):
+        pred = tree_model.predict(input_df)[0]
+        prob = tree_model.predict_proba(input_df)[0][1]
+        result = "Will Default" if pred == 1 else "Will Not Default"
+        st.success(f"**{result}** with probability: **{prob:.2f}**")
 
-# Confusion Matrices
-for model, res in results.items():
-    st.write(f"**{model} - Confusion Matrix**")
-    cm = res['cm']
-    fig, ax = plt.subplots()
-    ax.matshow(cm, cmap='Blues', alpha=0.3)
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
-            ax.text(j, i, cm[i, j], va='center', ha='center')
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Actual")
+# -----------------------
+# 6. Show Performance
+# -----------------------
+
+with st.expander("📈 Model Performance", expanded=False):
+    st.subheader("Metrics")
+    metric_df = pd.DataFrame({
+        model: {
+            'precision': res['precision'],
+            'recall': res['recall'],
+            'f1-score': res['f1']
+        }
+        for model, res in results.items()
+    }).T
+    st.dataframe(metric_df.style.format("{:.2f}"))
+
+    for model, res in results.items():
+        st.write(f"**{model} - Confusion Matrix**")
+        cm = res['cm']
+        fig, ax = plt.subplots()
+        ax.matshow(cm, cmap='Blues', alpha=0.3)
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                ax.text(j, i, cm[i, j], va='center', ha='center')
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
+        st.pyplot(fig)
+
+# -----------------------
+# 7. Feature Importance
+# -----------------------
+
+with st.expander("📊 Feature Importance", expanded=False):
+    st.subheader("Top 10 Features")
+    pre = tree_model.named_steps['pre']
+    encoded_cat = pre.named_transformers_['cat'].get_feature_names_out(cat_cols)
+    feat_names = num_cols + list(encoded_cat)
+    importances = tree_model.named_steps['clf'].feature_importances_
+    idx = np.argsort(importances)[::-1][:10]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.barh([feat_names[i] for i in idx][::-1], importances[idx][::-1])
+    ax.set_title("Top 10 Feature Importances")
     st.pyplot(fig)
 
-# 8. Feature Importance
-st.subheader("Feature Importance (Decision Tree)")
-pre = tree_model.named_steps['pre']
-encoded_cat = pre.named_transformers_['cat'].get_feature_names_out(cat_cols)
-feat_names = num_cols + list(encoded_cat)
-importances = tree_model.named_steps['clf'].feature_importances_
-idx = np.argsort(importances)[::-1][:10]
+# -----------------------
+# 8. Tree Visualization
+# -----------------------
 
-fig, ax = plt.subplots(figsize=(8, 6))
-ax.barh([feat_names[i] for i in idx][::-1], importances[idx][::-1])
-ax.set_title("Top 10 Feature Importances")
-st.pyplot(fig)
-
-# 9. Tree Visualization
-st.subheader("Decision Tree (Top Levels)")
-fig, ax = plt.subplots(figsize=(20, 8))
-plot_tree(
-    tree_model.named_steps['clf'],
-    feature_names=feat_names,
-    class_names=['No Default', 'Default'],
-    filled=True,
-    max_depth=3,
-    fontsize=10,
-    ax=ax
-)
-st.pyplot(fig)
+with st.expander("🌳 Decision Tree (Top Levels)", expanded=False):
+    fig, ax = plt.subplots(figsize=(20, 8))
+    plot_tree(
+        tree_model.named_steps['clf'],
+        feature_names=feat_names,
+        class_names=['No Default', 'Default'],
+        filled=True,
+        max_depth=3,
+        fontsize=10,
+        ax=ax
+    )
+    st.pyplot(fig)
