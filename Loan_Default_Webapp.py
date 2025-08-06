@@ -205,8 +205,10 @@ def main():
         missing = df.isnull().sum().sum()
         st.write(f'Total missing values: {missing}')
 
-    # Show EDA
-    show_eda(df)
+    # Show EDA only once
+    if 'eda_shown' not in st.session_state:
+        show_eda(df)
+        st.session_state['eda_shown'] = True
 
     # Prepare data
     X = df.drop(columns=['LoanID', 'Default'])
