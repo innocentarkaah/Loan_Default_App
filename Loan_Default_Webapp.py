@@ -55,20 +55,28 @@ TOP_FEATURES = [
 # --------------------------------------------------------------------------
 @st.cache_data
 def load_data(path: str) -> pd.DataFrame:
+    """
+    Read the CSV into a DataFrame, convert object columns to str, and cache the result.
+    """
     df = pd.read_csv(path)
     for col in df.select_dtypes(include='object').columns:
         df[col] = df[col].astype(str)
     return df
 
-# --------------------------------------------------------------------------
-# Prepare Class Balance Information
-# --------------------------------------------------------------------------
 @st.cache_data
 def get_balanced_counts(df: pd.DataFrame):
+    """
+    Calculate how many samples belong to each class before and after adjusting
+    for class imbalance using SMOTE. This information is reused across sessions.
+    """
+    # Original class distribution
     orig = df['Default'].value_counts().sort_index()
-    sm = SMOTE(random_state=42)
+    # Prepare data for SMOTE
     numeric_cols = df.select_dtypes(include=np.number).columns.drop('Default')
-    _, resampled_y = sm.fit_resample(df[numeric_cols], df['Default'])
+    X = df[numeric_cols].to_numpy()
+    y = df['Default'].to_numpy()
+    sm = SMOTE(random_state=42)
+    _, resampled_y = sm.fit_resample(X, y)
     balanced = pd.Series(resampled_y).value_counts().sort_index()
     return orig, balanced
 
