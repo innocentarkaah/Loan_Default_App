@@ -105,9 +105,11 @@ def plot_feature_importance(model: Pipeline, preprocessor: ColumnTransformer, to
     cat_pipe = preprocessor.transformers_[1][1]
     cat_feats = preprocessor.transformers_[1][2]
     encoded = cat_pipe.named_steps['encoder'].get_feature_names_out(cat_feats)
+
     names = np.concatenate([num_feats, encoded])
     importances = model.named_steps['classifier'].feature_importances_
     idx = np.argsort(importances)[::-1][:top_n]
+
     fig_imp, ax_imp = plt.subplots()
     sns.barplot(x=importances[idx], y=names[idx], orient='h', ax=ax_imp)
     ax_imp.set_title(f'Top {top_n} Features by Importance')
@@ -163,6 +165,7 @@ def user_input_sidebar(df: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------------------------------------------------
 def main():
     st.title('Loan Default Predictor')
+
     df = load_data('Loan_default.csv')
     with st.expander('Data Overview', expanded=True):
         st.dataframe(df.head())
@@ -176,6 +179,7 @@ def main():
 
     X = df.drop(columns=['LoanID', 'Default'])
     y = df['Default']
+
     pipeline = build_pipeline()
     try:
         model = joblib.load('xgb_model.joblib')
@@ -194,23 +198,24 @@ def main():
         st.sidebar.success(f"Model trained (best params: {grid.best_params_})")
 
     with st.expander('Model Evaluation', expanded=False):
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,
+                                                            random_state=42, stratify=y)
         y_pred = model.predict(X_test)
-        y_proba = model.predict_proba(X_test)[:,1]
+        y_proba = model.predict_proba(X_test)[:, 1]
         st.subheader('Performance Metrics')
-        rep_df = pd.DataFrame(classification_report(y_test,y_pred,output_dict=True)).transpose()
+        rep_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()
         st.dataframe(rep_df)
         st.subheader('Confusion Matrix')
-        cm = confusion_matrix(y_test,y_pred)
+        cm = confusion_matrix(y_test, y_pred)
         fig_cm, ax_cm = plt.subplots()
         ConfusionMatrixDisplay(cm).plot(ax=ax_cm)
         st.pyplot(fig_cm)
         st.subheader('ROC Curve')
-        fpr, tpr, _ = roc_curve(y_test,y_proba)
-        roc_auc = auc(fpr,tpr)
+        fpr, tpr, _ = roc_curve(y_test, y_proba)
+        roc_auc = auc(fpr, tpr)
         fig_roc, ax_roc = plt.subplots()
-        ax_roc.plot(fpr,tpr,label=f'AUC = {roc_auc:.2f}')
-        ax_roc.plot([0,1],[0,1],'k--')
+        ax_roc.plot(fpr, tpr, label=f'AUC = {roc_auc:.2f}')
+        ax_roc.plot([0, 1], [0, 1], 'k--')
         ax_roc.set_xlabel('False Positive Rate')
         ax_roc.set_ylabel('True Positive Rate')
         ax_roc.legend()
