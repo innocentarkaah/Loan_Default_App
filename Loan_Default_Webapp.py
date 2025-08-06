@@ -16,15 +16,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc, ConfusionMatrixDisplay
-
-from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline as ImbPipeline
 from xgboost import XGBClassifier
 
 # --------------------------------------------------------------------------
 # Page Appearance Setup
 # --------------------------------------------------------------------------
-# Use a clean Seaborn theme for plots and configure the Streamlit layout
 sns.set_theme(style='whitegrid', palette='muted')
 st.set_page_config(page_title='Loan Default Prediction App', layout='wide')
 
@@ -42,8 +38,6 @@ CATEGORICAL_FEATURES = [
     'HasCoSigner'
 ]
 ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
-
-# Replace or reorder based on your model's top feature importances
 TOP_FEATURES = [
     'CreditScore', 'Income', 'Age', 'LoanAmount', 'DTIRatio',
     'MonthsEmployed', 'InterestRate', 'NumCreditLines', 'LoanTerm',
@@ -55,30 +49,15 @@ TOP_FEATURES = [
 # --------------------------------------------------------------------------
 @st.cache_data
 def load_data(path: str) -> pd.DataFrame:
-    """
-    Read the CSV into a DataFrame, convert object columns to str, and cache the result.
-    """
     df = pd.read_csv(path)
     for col in df.select_dtypes(include='object').columns:
         df[col] = df[col].astype(str)
     return df
 
 @st.cache_data
-def get_balanced_counts(df: pd.DataFrame):
-    """
-    Calculate how many samples belong to each class before and after adjusting
-    for class imbalance using SMOTE. This information is reused across sessions.
-    """
-    # Original class distribution
+def get_class_counts(df: pd.DataFrame):
     orig = df['Default'].value_counts().sort_index()
-    # Prepare data for SMOTE
-    numeric_cols = df.select_dtypes(include=np.number).columns.drop('Default')
-    X = df[numeric_cols].to_numpy()
-    y = df['Default'].to_numpy()
-    sm = SMOTE(random_state=42)
-    _, resampled_y = sm.fit_resample(X, y)
-    balanced = pd.Series(resampled_y).value_counts().sort_index()
-    return orig, balanced
+    return orig
 
 # --------------------------------------------------------------------------
 # Exploratory Data Analysis
@@ -89,60 +68,48 @@ def show_eda(df: pd.DataFrame):
         st.write(df.describe(include='all'))
 
         st.subheader('Class Distribution')
-        orig_counts, balanced_counts = get_balanced_counts(df)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown('**Original Data**')
-            fig1, ax1 = plt.subplots()
-            sns.barplot(x=orig_counts.index, y=orig_counts.values, ax=ax1)
-            ax1.set_xlabel('Default Flag')
-            ax1.set_ylabel('Sample Count')
-            st.pyplot(fig1)
-        with col2:
-            st.markdown('**After SMOTE Balancing**')
-            fig2, ax2 = plt.subplots()
-            sns.barplot(x=balanced_counts.index, y=balanced_counts.values, ax=ax2)
-            ax2.set_xlabel('Default Flag')
-            ax2.set_ylabel('Sample Count')
-            st.pyplot(fig2)
+        counts = get_class_counts(df)
+        fig, ax = plt.subplots()
+        sns.barplot(x=counts.index, y=counts.values, ax=ax)
+        ax.set_xlabel('Default Flag')
+        ax.set_ylabel('Sample Count')
+        st.pyplot(fig)
 
         st.subheader('Correlation Matrix')
         num_cols = df.select_dtypes(include=np.number).columns.drop('Default')
         corr = df[num_cols].corr()
-        fig3, ax3 = plt.subplots()
-        sns.heatmap(corr, annot=True, fmt='.2f', cmap='vlag', ax=ax3)
-        ax3.set_title('Numeric Feature Correlations')
-        st.pyplot(fig3)
+        fig2, ax2 = plt.subplots()
+        sns.heatmap(corr, annot=True, fmt='.2f', cmap='vlag', ax=ax2)
+        ax2.set_title('Numeric Feature Correlations')
+        st.pyplot(fig2)
 
         st.subheader('Numeric Feature Histograms')
         for col in num_cols[:6]:
-            fig, ax = plt.subplots()
-            sns.histplot(df[col], kde=True, ax=ax)
-            ax.set_title(f'Distribution of {col}')
-            st.pyplot(fig)
+            fig_hist, ax_hist = plt.subplots()
+            sns.histplot(df[col], kde=True, ax=ax_hist)
+            ax_hist.set_title(f'Distribution of {col}')
+            st.pyplot(fig_hist)
 
         st.subheader('Boxplots of Numeric Features')
         melted = df[num_cols].melt(var_name='Feature', value_name='Value')
-        fig4, ax4 = plt.subplots()
-        sns.boxplot(x='Feature', y='Value', data=melted, ax=ax4)
+        fig_box, ax_box = plt.subplots()
+        sns.boxplot(x='Feature', y='Value', data=melted, ax=ax_box)
         plt.xticks(rotation=45)
-        st.pyplot(fig4)
+        st.pyplot(fig_box)
 
 # --------------------------------------------------------------------------
 # Plot Feature Importances
 # --------------------------------------------------------------------------
-def plot_feature_importance(model: ImbPipeline, preprocessor: ColumnTransformer, top_n: int = 10):
-    numeric_features = preprocessor.transformers_[0][2]
+def plot_feature_importance(model: Pipeline, preprocessor: ColumnTransformer, top_n: int = 10):
+    num_feats = preprocessor.transformers_[0][2]
     cat_pipe = preprocessor.transformers_[1][1]
-    categorical_features = preprocessor.transformers_[1][2]
-    encoded = cat_pipe.named_steps['encoder'].get_feature_names_out(categorical_features)
-
-    feature_names = np.concatenate([numeric_features, encoded])
+    cat_feats = preprocessor.transformers_[1][2]
+    encoded = cat_pipe.named_steps['encoder'].get_feature_names_out(cat_feats)
+    names = np.concatenate([num_feats, encoded])
     importances = model.named_steps['classifier'].feature_importances_
     idx = np.argsort(importances)[::-1][:top_n]
-
     fig_imp, ax_imp = plt.subplots()
-    sns.barplot(x=importances[idx], y=feature_names[idx], orient='h', ax=ax_imp)
+    sns.barplot(x=importances[idx], y=names[idx], orient='h', ax=ax_imp)
     ax_imp.set_title(f'Top {top_n} Features by Importance')
     ax_imp.set_xlabel('Importance Score')
     return fig_imp
@@ -151,7 +118,7 @@ def plot_feature_importance(model: ImbPipeline, preprocessor: ColumnTransformer,
 # Construct Machine Learning Pipeline
 # --------------------------------------------------------------------------
 @st.cache_resource
-def build_pipeline(params=None) -> ImbPipeline:
+def build_pipeline() -> Pipeline:
     num_pipe = Pipeline([
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())
@@ -160,17 +127,14 @@ def build_pipeline(params=None) -> ImbPipeline:
         ('imputer', SimpleImputer(strategy='most_frequent')),
         ('encoder', OneHotEncoder(handle_unknown='ignore'))
     ])
-
     preprocessor = ColumnTransformer([
         ('num', num_pipe, NUMERIC_FEATURES),
         ('cat', cat_pipe, CATEGORICAL_FEATURES)
     ])
-
     clf = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
     selector = SelectKBest(score_func=f_classif, k='all')
-    return ImbPipeline([
+    return Pipeline([
         ('preprocessor', preprocessor),
-        ('smote', SMOTE(random_state=42)),
         ('selector', selector),
         ('classifier', clf)
     ])
@@ -180,32 +144,25 @@ def build_pipeline(params=None) -> ImbPipeline:
 # --------------------------------------------------------------------------
 def user_input_sidebar(df: pd.DataFrame) -> pd.DataFrame:
     st.sidebar.header('Make a Prediction')
-    user_vals = {}
+    vals = {}
     for feat in TOP_FEATURES:
         if feat in NUMERIC_FEATURES:
             md = float(df[feat].median())
-            user_vals[feat] = st.sidebar.number_input(feat, value=md)
+            vals[feat] = st.sidebar.number_input(feat, value=md)
         else:
             opts = df[feat].dropna().unique().tolist()
-            user_vals[feat] = st.sidebar.selectbox(feat, opts)
-
-    input_df = pd.DataFrame([user_vals])
-    # fill remaining features
+            vals[feat] = st.sidebar.selectbox(feat, opts)
+    inp = pd.DataFrame([vals])
     for feat in ALL_FEATURES:
-        if feat not in input_df.columns:
-            if feat in NUMERIC_FEATURES:
-                input_df[feat] = df[feat].mean()
-            else:
-                input_df[feat] = df[feat].mode()[0]
-    return input_df
+        if feat not in inp.columns:
+            inp[feat] = df[feat].mean() if feat in NUMERIC_FEATURES else df[feat].mode()[0]
+    return inp
 
 # --------------------------------------------------------------------------
 # Main Application Logic
 # --------------------------------------------------------------------------
 def main():
     st.title('Loan Default Predictor')
-
-    # Load data and show overview
     df = load_data('Loan_default.csv')
     with st.expander('Data Overview', expanded=True):
         st.dataframe(df.head())
@@ -213,16 +170,12 @@ def main():
         missing = df.isnull().sum().sum()
         st.write(f'Total missing values: {missing}')
 
-    # Show EDA only once
     if 'eda_shown' not in st.session_state:
         show_eda(df)
         st.session_state['eda_shown'] = True
 
-    # Prepare data
     X = df.drop(columns=['LoanID', 'Default'])
     y = df['Default']
-
-    # Build or load model
     pipeline = build_pipeline()
     try:
         model = joblib.load('xgb_model.joblib')
@@ -240,7 +193,6 @@ def main():
         joblib.dump(model, 'xgb_model.joblib')
         st.sidebar.success(f"Model trained (best params: {grid.best_params_})")
 
-    # Evaluate section
     with st.expander('Model Evaluation', expanded=False):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
         y_pred = model.predict(X_test)
@@ -264,10 +216,9 @@ def main():
         ax_roc.legend()
         st.pyplot(fig_roc)
         st.subheader('Key Features (Importance)')
-        fig_imp = plot_feature_importance(model, model.named_steps['preprocessor'], top_n=10)
+        fig_imp = plot_feature_importance(model, pipeline.named_steps['preprocessor'], top_n=10)
         st.pyplot(fig_imp)
 
-    # Sidebar input and predict
     input_df = user_input_sidebar(df)
     if st.sidebar.button('Predict Default'):
         X_input = input_df[ALL_FEATURES]
@@ -281,7 +232,5 @@ def main():
         st.subheader('Default Probability')
         st.write(f"**{proba*100:.2f}%**")
 
-# ===========================================================================
 if __name__ == '__main__':
     main()
-# ===========================================================================
