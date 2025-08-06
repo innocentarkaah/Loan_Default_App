@@ -19,7 +19,7 @@ from xgboost import XGBClassifier
 sns.set_theme(style="whitegrid", palette="muted")  # Use seaborn theme for consistency
 st.set_page_config(page_title="Loan Default Prediction App", layout="wide")
 st.title("Loan Default Prediction App")
-st.markdown("Supervised Machine Learning")
+st.markdown("Supervised Machine Learning Approach")
 
 # -----------------------------------------
 # Data Loading: Read and cache dataset
