@@ -56,8 +56,7 @@ def load_data(path: str) -> pd.DataFrame:
 
 @st.cache_data
 def get_class_counts(df: pd.DataFrame):
-    orig = df['Default'].value_counts().sort_index()
-    return orig
+    return df['Default'].value_counts().sort_index()
 
 # --------------------------------------------------------------------------
 # Exploratory Data Analysis
@@ -198,8 +197,7 @@ def main():
         st.sidebar.success(f"Model trained (best params: {grid.best_params_})")
 
     with st.expander('Model Evaluation', expanded=False):
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,
-                                                            random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
         y_pred = model.predict(X_test)
         y_proba = model.predict_proba(X_test)[:, 1]
         st.subheader('Performance Metrics')
