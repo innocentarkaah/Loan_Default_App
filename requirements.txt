@@ -1,3 +1,4 @@
+pip>=25.2
 scikit-learn
 imbalanced-learn
 threadpoolctl
@@ -9,4 +10,3 @@ matplotlib
 seaborn
 joblib
 packaging
---force-reinstall
