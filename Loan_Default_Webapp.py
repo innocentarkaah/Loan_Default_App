@@ -1,66 +1,4 @@
-# ===== VERSION COMPATIBILITY FIX =====
-import subprocess
-import sys
-import os
 import streamlit as st
-
-# Define required versions
-REQUIREMENTS = {
-    'scikit-learn': '1.0',
-    'imbalanced-learn': '0.8'
-}
-
-def check_package_versions():
-    """Check if required package versions are installed"""
-    try:
-        from sklearn.utils._tags import _safe_tags  # Requires sklearn>=1.0
-        from imblearn.over_sampling import SMOTE
-        return True
-    except (ImportError, ModuleNotFoundError):
-        return False
-
-# Perform version check
-if not check_package_versions():
-    st.warning("**Compatibility Issue Detected**")
-    st.error(f"""
-    Required package versions not met. This app needs:
-    - scikit-learn >= {REQUIREMENTS['scikit-learn']}
-    - imbalanced-learn >= {REQUIREMENTS['imbalanced-learn']}
-    """)
-    
-    # Streamlit Cloud specific handling
-    if 'HOSTNAME' in os.environ and 'streamlit' in os.environ['HOSTNAME']:
-        st.info("""
-        **Streamlit Cloud Instructions:**
-        Please add the following to your `requirements.txt` and redeploy:
-        ```
-        scikit-learn>=1.0
-        imbalanced-learn>=0.8
-        ```
-        """)
-    else:
-        if st.button("**Upgrade Packages Now**"):
-            with st.spinner("Upgrading packages..."):
-                packages = [f'{pkg}>={ver}' for pkg, ver in REQUIREMENTS.items()]
-                try:
-                    subprocess.check_call([
-                        sys.executable, '-m', 'pip', 'install', '--upgrade'
-                    ] + packages)
-                    st.success("""
-                    Packages upgraded successfully! The page will now reload.
-                    """)
-                    st.experimental_rerun()
-                except subprocess.CalledProcessError:
-                    st.error(f"""
-                    Upgrade failed. Please run manually:
-                    ```
-                    pip install --upgrade {' '.join(packages)}
-                    ```
-                    Then restart the app.
-                    """)
-    st.stop()
-# ===== END FIX =====
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -149,11 +87,10 @@ def build_pipeline():
 # Plot top N important features using model's feature importances
 def plot_feature_importance(model, top_n=10):
     preprocessor = model.named_steps['preprocessor']
-    # transformers is list of (name, transformer, columns)
-    num_feats = preprocessor.transformers[0][2]
-    cat_pipe = preprocessor.transformers[1][1].named_steps['encoder']
-    cat_feats = preprocessor.transformers[1][2]
-    encoded_cat_feats = cat_pipe.get_feature_names_out(cat_feats)
+    num_feats = preprocessor.transformers_[0][2]
+    cat_encoder = preprocessor.transformers_[1][1].named_steps['encoder']
+    cat_feats = preprocessor.transformers_[1][2]
+    encoded_cat_feats = cat_encoder.get_feature_names_out(cat_feats)
     all_feature_names = np.concatenate([num_feats, encoded_cat_feats])
     importances = model.named_steps['classifier'].feature_importances_
     idx = np.argsort(importances)[::-1][:top_n]
