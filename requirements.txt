@@ -9,4 +9,4 @@ numpy
 matplotlib
 seaborn
 joblib
-packaging
+
