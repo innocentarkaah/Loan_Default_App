@@ -90,7 +90,7 @@ def plot_feature_importance(model, top_n=10):
     ax.set_title('Top Features')
     return fig
 
-# Sidebar for user input (updated to use ALL features)
+# Sidebar for user input (updated without min/max restriction)
 def user_input_sidebar(df, model_loaded):
     if model_loaded:
         st.sidebar.success("Trained model loaded successfully from file.")
@@ -101,13 +101,10 @@ def user_input_sidebar(df, model_loaded):
     for feat in ALL_FEATURES:
         if feat in NUMERIC_FEATURES:
             default = float(df[feat].median())
-            min_val = float(df[feat].min())
-            max_val = float(df[feat].max())
-            data[feat] = st.sidebar.slider(
+            data[feat] = st.sidebar.number_input(
                 feat,
-                min_value=min_val,
-                max_value=max_val,
-                value=default
+                value=default,
+                step=1.0 if np.issubdtype(df[feat].dtype, np.integer) else 0.01
             )
         else:
             options = sorted(df[feat].dropna().unique().tolist())
