@@ -1,9 +1,9 @@
+scikit-learn>=1.0
+imbalanced-learn>=0.8
 streamlit
 pandas
 numpy
 matplotlib
 seaborn
-joblib
 xgboost
-scikit-learn>=1.0
-imbalanced-learn>=0.8
+joblib
