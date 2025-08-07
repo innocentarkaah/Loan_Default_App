@@ -17,11 +17,11 @@ from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
 from xgboost import XGBClassifier
 
-# Page configuration: layout and title
+# Page configuration
 st.set_page_config(page_title='Loan Default Prediction App', layout='wide')
 sns.set_theme(style='whitegrid', palette='muted')
 
-# Define which features are numerical and which are categorical
+# Define features
 NUMERIC_FEATURES = ['Age', 'Income', 'LoanAmount', 'CreditScore', 'MonthsEmployed',
                     'NumCreditLines', 'InterestRate', 'LoanTerm', 'DTIRatio']
 
@@ -29,12 +29,9 @@ CATEGORICAL_FEATURES = ['Education', 'EmploymentType', 'MaritalStatus',
                         'HasMortgage', 'HasDependents', 'LoanPurpose', 'HasCoSigner']
 
 ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
-
-# Select top features to display in the prediction sidebar
 TOP_FEATURES = ['CreditScore', 'Income', 'Age', 'LoanAmount', 'DTIRatio',
                 'MonthsEmployed', 'InterestRate', 'NumCreditLines', 'LoanTerm', 'Education']
 
-# Load dataset with Streamlit caching
 @st.cache_data
 def load_data(path):
     df = pd.read_csv(path)
@@ -42,7 +39,6 @@ def load_data(path):
         df[col] = df[col].astype(str)
     return df
 
-# Calculate original and SMOTE-balanced class distribution
 @st.cache_data
 def get_balanced_counts(df):
     orig = df['Default'].value_counts().sort_index()
@@ -53,30 +49,25 @@ def get_balanced_counts(df):
     balanced = pd.Series(res_y).value_counts().sort_index()
     return orig, balanced
 
-# Create a full preprocessing + modeling pipeline
 def build_pipeline():
-    # Numeric features: impute missing values and scale
     num_pipe = Pipeline([
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())
     ])
 
-    # Categorical features: impute and encode using one-hot
     cat_pipe = Pipeline([
         ('imputer', SimpleImputer(strategy='most_frequent')),
         ('encoder', OneHotEncoder(handle_unknown='ignore'))
     ])
 
-    # Combine both pipelines
     preprocessor = ColumnTransformer([
         ('num', num_pipe, NUMERIC_FEATURES),
         ('cat', cat_pipe, CATEGORICAL_FEATURES)
     ])
 
-    # Define the model
-    classifier = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+    # ✅ Fixed: removed use_label_encoder
+    classifier = XGBClassifier(eval_metric='logloss', random_state=42)
 
-    # Full modeling pipeline including SMOTE and feature selection
     return ImbPipeline([
         ('preprocessor', preprocessor),
         ('smote', SMOTE(random_state=42)),
@@ -84,7 +75,6 @@ def build_pipeline():
         ('classifier', classifier)
     ])
 
-# Plot top N important features using model's feature importances
 def plot_feature_importance(model, top_n=10):
     preprocessor = model.named_steps['preprocessor']
     num_feats = preprocessor.transformers_[0][2]
@@ -99,7 +89,6 @@ def plot_feature_importance(model, top_n=10):
     ax.set_title('Top Features')
     return fig
 
-# Sidebar input UI for prediction
 def user_input_sidebar(df, model_loaded):
     if model_loaded:
         st.sidebar.success("Trained model loaded successfully from file.")
@@ -120,35 +109,22 @@ def user_input_sidebar(df, model_loaded):
             inp[feat] = df[feat].mean() if feat in NUMERIC_FEATURES else df[feat].mode()[0]
     return inp
 
-# Main app function
 def main():
     st.title('Loan Default Prediction App')
     df = load_data('Loan_default.csv')
 
-    # --- Data Overview section
     with st.expander("🔍 Data Overview", expanded=False):
-        overview = st.selectbox(
-            "Select what to display:",
-            ["Total Missing Values", "Data Head", "Data Types", "Descriptive Statistics"]
-        )
+        overview = st.selectbox("Select what to display:",
+            ["Total Missing Values", "Data Head", "Data Types", "Descriptive Statistics"])
 
         if overview == "Total Missing Values":
-            missing = df.isnull().sum().rename("missing_count")
-            st.write("Missing values per column:")
-            st.dataframe(missing.to_frame())
-
+            st.dataframe(df.isnull().sum().rename("missing_count").to_frame())
         elif overview == "Data Head":
             n = st.slider("Number of rows to view:", min_value=5, max_value=50, value=5, step=5)
-            st.write(f"First {n} rows of the dataset:")
             st.dataframe(df.head(n))
-
         elif overview == "Data Types":
-            dtypes = df.dtypes.rename("dtype")
-            st.write("Column data types:")
-            st.dataframe(dtypes.to_frame())
-
-        else:  # Descriptive Statistics
-            st.write("Descriptive statistics for numerical columns:")
+            st.dataframe(df.dtypes.rename("dtype").to_frame())
+        else:
             st.dataframe(df.describe())
 
     with st.expander("Exploratory Data Analysis (EDA)", expanded=False):
