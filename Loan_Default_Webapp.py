@@ -1,4 +1,94 @@
+# ===== STREAMLIT CLOUD COMPATIBILITY FIX =====
+import sys
+import os
+import subprocess
 import streamlit as st
+
+# 1. Environment Diagnostics
+st.sidebar.subheader("Environment Diagnostics")
+st.sidebar.write(f"Python: {sys.version}")
+st.sidebar.write(f"System: {sys.platform}")
+st.sidebar.write(f"Working Directory: {os.getcwd()}")
+
+# 2. Package Conflict Resolution
+REQUIREMENTS = {
+    'scikit-learn': '1.0.2',
+    'imbalanced-learn': '0.8.1',
+    'threadpoolctl': '3.1.0',
+    'xgboost': '1.7.5'
+}
+
+# 3. Import Safety Check
+def safe_import():
+    """Test critical imports with version verification"""
+    try:
+        from sklearn import __version__ as sklearn_version
+        from sklearn.utils._tags import _safe_tags
+        
+        from imblearn import __version__ as imblearn_version
+        from imblearn.over_sampling import SMOTE
+        
+        # Version verification
+        from packaging import version
+        sklearn_ok = version.parse(sklearn_version) >= version.parse(REQUIREMENTS['scikit-learn'])
+        imblearn_ok = version.parse(imblearn_version) >= version.parse(REQUIREMENTS['imbalanced-learn'])
+        
+        return sklearn_ok and imblearn_ok, sklearn_version, imblearn_version
+        
+    except ImportError as e:
+        return False, "not installed", "not installed"
+    except Exception as e:
+        return False, "error", f"{type(e).__name__}: {str(e)}"
+
+# 4. Compatibility Check & Fix
+compatible, sklearn_ver, imblearn_ver = safe_import()
+
+if not compatible:
+    st.warning("**⚠️ COMPATIBILITY ISSUE DETECTED**")
+    
+    # Show current versions
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("scikit-learn", sklearn_ver, 
+                 delta="INCOMPATIBLE" if sklearn_ver != REQUIREMENTS['scikit-learn'] else None,
+                 help=f"Required: {REQUIREMENTS['scikit-learn']}")
+    with col2:
+        st.metric("imbalanced-learn", imblearn_ver, 
+                 delta="INCOMPATIBLE" if imblearn_ver != REQUIREMENTS['imbalanced-learn'] else None,
+                 help=f"Required: {REQUIREMENTS['imbalanced-learn']}")
+    
+    # Automatic fix option
+    st.error("""
+    Critical dependency conflict detected. This is often caused by:
+    - Version pinning conflicts in Streamlit Cloud's dependency resolver
+    - Missing system dependencies (OpenMP/libgomp)
+    - Binary compatibility issues on Linux
+    """)
+    
+    # Show manual resolution steps
+    st.info("""
+    **MANUAL RESOLUTION STEPS:**
+    1. Add `packages.txt` to your repository root with:
+    ```txt
+    libgomp1
+    build-essential
+    python3-dev
+    ```
+    2. Update `requirements.txt` with:
+    ```txt
+    scikit-learn==1.0.2
+    imbalanced-learn==0.8.1
+    threadpoolctl==3.1.0
+    xgboost==1.7.5
+    --force-reinstall
+    ```
+    3. Redeploy your application
+    """)
+    st.link_button("View Logs in Streamlit Cloud", "https://share.streamlit.io/")
+    
+    st.stop()
+# ===== END FIX =====
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
