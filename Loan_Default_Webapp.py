@@ -29,9 +29,8 @@ CATEGORICAL_FEATURES = ['Education', 'EmploymentType', 'MaritalStatus',
                         'HasMortgage', 'HasDependents', 'LoanPurpose', 'HasCoSigner']
 
 ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
-TOP_FEATURES = ['CreditScore', 'Income', 'Age', 'LoanAmount', 'DTIRatio',
-                'MonthsEmployed', 'InterestRate', 'NumCreditLines', 'LoanTerm', 'Education']
 
+# Load dataset
 @st.cache_data
 def load_data(path):
     df = pd.read_csv(path)
@@ -39,6 +38,7 @@ def load_data(path):
         df[col] = df[col].astype(str)
     return df
 
+# Get original and SMOTE-balanced class distributions
 @st.cache_data
 def get_balanced_counts(df):
     orig = df['Default'].value_counts().sort_index()
@@ -49,6 +49,7 @@ def get_balanced_counts(df):
     balanced = pd.Series(res_y).value_counts().sort_index()
     return orig, balanced
 
+# Build full pipeline
 def build_pipeline():
     num_pipe = Pipeline([
         ('imputer', SimpleImputer(strategy='median')),
@@ -65,7 +66,6 @@ def build_pipeline():
         ('cat', cat_pipe, CATEGORICAL_FEATURES)
     ])
 
-    # ✅ Fixed: removed use_label_encoder
     classifier = XGBClassifier(eval_metric='logloss', random_state=42)
 
     return ImbPipeline([
@@ -75,6 +75,7 @@ def build_pipeline():
         ('classifier', classifier)
     ])
 
+# Plot feature importances
 def plot_feature_importance(model, top_n=10):
     preprocessor = model.named_steps['preprocessor']
     num_feats = preprocessor.transformers_[0][2]
@@ -89,6 +90,7 @@ def plot_feature_importance(model, top_n=10):
     ax.set_title('Top Features')
     return fig
 
+# Sidebar for user input (updated to use ALL features)
 def user_input_sidebar(df, model_loaded):
     if model_loaded:
         st.sidebar.success("Trained model loaded successfully from file.")
@@ -96,35 +98,52 @@ def user_input_sidebar(df, model_loaded):
     st.sidebar.header('Make a Prediction')
 
     data = {}
-    for feat in TOP_FEATURES:
+    for feat in ALL_FEATURES:
         if feat in NUMERIC_FEATURES:
             default = float(df[feat].median())
-            data[feat] = st.sidebar.number_input(feat, value=default)
+            min_val = float(df[feat].min())
+            max_val = float(df[feat].max())
+            data[feat] = st.sidebar.slider(
+                feat,
+                min_value=min_val,
+                max_value=max_val,
+                value=default
+            )
         else:
-            options = df[feat].dropna().unique().tolist()
-            data[feat] = st.sidebar.selectbox(feat, options)
-    inp = pd.DataFrame([data])
-    for feat in ALL_FEATURES:
-        if feat not in inp.columns:
-            inp[feat] = df[feat].mean() if feat in NUMERIC_FEATURES else df[feat].mode()[0]
-    return inp
+            options = sorted(df[feat].dropna().unique().tolist())
+            default_opt = df[feat].mode()[0]
+            data[feat] = st.sidebar.selectbox(feat, options, index=options.index(default_opt))
 
+    return pd.DataFrame([data])
+
+# Main function
 def main():
     st.title('Loan Default Prediction App')
     df = load_data('Loan_default.csv')
 
     with st.expander("🔍 Data Overview", expanded=False):
-        overview = st.selectbox("Select what to display:",
-            ["Total Missing Values", "Data Head", "Data Types", "Descriptive Statistics"])
+        overview = st.selectbox(
+            "Select what to display:",
+            ["Total Missing Values", "Data Head", "Data Types", "Descriptive Statistics"]
+        )
 
         if overview == "Total Missing Values":
-            st.dataframe(df.isnull().sum().rename("missing_count").to_frame())
+            missing = df.isnull().sum().rename("missing_count")
+            st.write("Missing values per column:")
+            st.dataframe(missing.to_frame())
+
         elif overview == "Data Head":
             n = st.slider("Number of rows to view:", min_value=5, max_value=50, value=5, step=5)
+            st.write(f"First {n} rows of the dataset:")
             st.dataframe(df.head(n))
+
         elif overview == "Data Types":
-            st.dataframe(df.dtypes.rename("dtype").to_frame())
+            dtypes = df.dtypes.rename("dtype")
+            st.write("Column data types:")
+            st.dataframe(dtypes.to_frame())
+
         else:
+            st.write("Descriptive statistics for numerical columns:")
             st.dataframe(df.describe())
 
     with st.expander("Exploratory Data Analysis (EDA)", expanded=False):
@@ -216,6 +235,7 @@ def main():
         st.subheader("Feature Importance")
         fig_imp = plot_feature_importance(model)
         st.pyplot(fig_imp)
+        st.caption("Note: Feature importance is based on the trained model using all features.")
 
     with st.expander("Prediction Result", expanded=False):
         inp_df = user_input_sidebar(df, model_loaded=model_loaded)
