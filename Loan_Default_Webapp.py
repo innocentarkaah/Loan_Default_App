@@ -45,7 +45,7 @@ st.title("Loan Default Prediction App")
 # =========================
 @st.cache_data
 def load_data():
-    data = pd.read_csv("Loan_Default_Data.csv")
+    data = pd.read_csv("Loan_Default.csv")
     return data
 
 try:
