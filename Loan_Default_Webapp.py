@@ -37,14 +37,20 @@ st.sidebar.header("Model Configuration")
 test_size = st.sidebar.slider("Test Size", 0.1, 0.5, 0.2)
 random_state = st.sidebar.number_input("Random State", 0, 100, 42)
 
+# Manual Reboot Button
+if st.sidebar.button("Reboot App"):
+    st.warning("Rebooting app...")
+    time.sleep(1)
+    os.execv(sys.executable, ['python'] + sys.argv)
+
 # Feature and target
 X = df.drop("default", axis=1)
 y = df["default"]
 
 # Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, 
-                                                    test_size=test_size, 
-                                                    random_state=random_state, 
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                    test_size=test_size,
+                                                    random_state=random_state,
                                                     stratify=y)
 
 # Preprocessing
