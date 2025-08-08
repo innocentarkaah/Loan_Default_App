@@ -30,11 +30,6 @@ CATEGORICAL_FEATURES = ['Education', 'EmploymentType', 'MaritalStatus',
 
 ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 
-# Reboot button at the top of the sidebar
-if st.sidebar.button("Reboot App 🔄"):
-    st.session_state.clear()
-    st.experimental_rerun()
-
 # Load dataset
 @st.cache_data
 def load_data(path):
