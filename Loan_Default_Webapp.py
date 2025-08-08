@@ -45,13 +45,13 @@ st.title("Loan Default Prediction App")
 # =========================
 @st.cache_data
 def load_data():
-    data = pd.read_csv("Loan_default.csv")
+    data = pd.read_csv("Loan_Default_Data.csv")
     return data
 
 try:
     df = load_data()
 except FileNotFoundError:
-    st.error("Data file not found. Please upload `Loan_Default.csv`.")
+    st.error("Data file not found. Please upload `Loan_Default_Data.csv`.")
     st.stop()
 
 # =========================
