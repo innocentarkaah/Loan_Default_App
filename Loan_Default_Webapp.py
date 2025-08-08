@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 import os
-import psutil  # For resource monitoring
 import time
+import resource  # Built-in, no external dependency
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -31,10 +31,11 @@ if st.sidebar.button("🔄 Reboot App"):
     st.cache_resource.clear()
     st.rerun()
 
-# --- Auto-reboot if memory usage exceeds 90% ---
-mem = psutil.virtual_memory()
-if mem.percent > 90:
-    st.warning("⚠️ System memory usage is high. Rebooting app to free resources...")
+# --- Auto-reboot if memory usage exceeds 90% (internal check) ---
+usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss  # in KB
+usage_mb = usage_kb / 1024
+if usage_mb > 900:  # Approximate ~90% of 1GB
+    st.warning("⚠️ High memory usage detected. Rebooting app...")
     time.sleep(1)
     st.cache_data.clear()
     st.cache_resource.clear()
@@ -135,7 +136,7 @@ def user_input_sidebar(df, model_loaded):
 # Main function
 def main():
     st.title('Loan Default Prediction App')
-    df = load_data('Loan_default.csv')  # <-- Changed data source here
+    df = load_data('Loan_default.csv')
 
     with st.expander("🔍 Data Overview", expanded=False):
         overview = st.selectbox(
