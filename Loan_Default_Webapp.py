@@ -12,6 +12,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc, ConfusionMatrixDisplay, accuracy_score, f1_score
+from imblearn.over_sampling import SMOTE
 
 # Page configuration
 st.set_page_config(page_title='Loan Default Prediction App', layout='wide')
@@ -31,6 +32,18 @@ def load_data(path):
     for col in df.select_dtypes(include='object').columns:
         df[col] = df[col].astype(str)
     return df
+
+# Get balanced class counts
+@st.cache_data
+def get_balanced_counts(df):
+    orig = df['Default'].value_counts().sort_index()
+    # Apply SMOTE to balance classes
+    X = df[NUMERIC_FEATURES].copy()
+    y = df['Default']
+    smote = SMOTE(random_state=42)
+    _, y_res = smote.fit_resample(X, y)
+    balanced = y_res.value_counts().sort_index()
+    return orig, balanced
 
 # Build preprocessing pipeline
 @st.cache_resource
@@ -152,29 +165,63 @@ def main():
     
     # EDA Section
     with st.expander("📊 Exploratory Data Analysis (EDA)", expanded=False):
-        st.subheader('Target Distribution')
-        fig1, ax1 = plt.subplots()
-        df['Default'].value_counts().plot(kind='bar', ax=ax1)
-        ax1.set_title('Default Status Distribution')
-        ax1.set_xticklabels(['Non-Default', 'Default'], rotation=0)
-        st.pyplot(fig1)
+        # Class distribution before/after balancing
+        st.subheader('Class Distribution')
+        orig, balanced = get_balanced_counts(df)
         
+        col1, col2 = st.columns(2)
+        with col1:
+            fig1, ax1 = plt.subplots()
+            sns.barplot(x=orig.index, y=orig.values, ax=ax1)
+            ax1.set_title('Original Distribution')
+            ax1.set_xticklabels(['Non-Default', 'Default'])
+            ax1.set_ylabel('Count')
+            st.pyplot(fig1)
+            
+            st.write("**Original Class Counts:**")
+            st.dataframe(orig.rename('Count').to_frame())
+        
+        with col2:
+            fig2, ax2 = plt.subplots()
+            sns.barplot(x=balanced.index, y=balanced.values, ax=ax2)
+            ax2.set_title('After SMOTE Balancing')
+            ax2.set_xticklabels(['Non-Default', 'Default'])
+            ax2.set_ylabel('Count')
+            st.pyplot(fig2)
+            
+            st.write("**Balanced Class Counts:**")
+            st.dataframe(balanced.rename('Count').to_frame())
+        
+        # Box plots
+        st.subheader('Box Plots - Key Features')
+        box_features = ['Income', 'CreditScore', 'LoanAmount', 'Age', 'InterestRate']
+        cols = st.columns(2)
+        for i, feat in enumerate(box_features):
+            with cols[i % 2]:
+                fig_box, ax_box = plt.subplots()
+                sns.boxplot(x='Default', y=feat, data=df, ax=ax_box)
+                ax_box.set_title(f'{feat} Distribution by Default Status')
+                ax_box.set_xticklabels(['Non-Default', 'Default'])
+                st.pyplot(fig_box)
+        
+        # Correlation matrix
         st.subheader('Correlation Matrix')
         num_cols = df.select_dtypes(include=np.number).columns
         corr = df[num_cols].corr()
-        fig2, ax2 = plt.subplots(figsize=(10, 8))
-        sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', center=0, ax=ax2)
-        st.pyplot(fig2)
+        fig3, ax3 = plt.subplots(figsize=(10, 8))
+        sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', center=0, ax=ax3)
+        st.pyplot(fig3)
         
-        st.subheader('Key Features Distribution')
-        features = ['Income', 'CreditScore', 'LoanAmount', 'Age']
+        # Histograms
+        st.subheader('Feature Distributions')
+        hist_features = ['Income', 'CreditScore', 'LoanAmount', 'Age', 'DTIRatio']
         cols = st.columns(2)
-        for i, feat in enumerate(features):
+        for i, feat in enumerate(hist_features):
             with cols[i % 2]:
-                fig, ax = plt.subplots()
-                sns.histplot(df[feat], kde=True, ax=ax)
-                ax.set_title(f'{feat} Distribution')
-                st.pyplot(fig)
+                fig_hist, ax_hist = plt.subplots()
+                sns.histplot(df[feat], kde=True, ax=ax_hist)
+                ax_hist.set_title(f'{feat} Distribution')
+                st.pyplot(fig_hist)
     
     # Preprocessing and Modeling
     X = df.drop(columns=['LoanID', 'Default'])
