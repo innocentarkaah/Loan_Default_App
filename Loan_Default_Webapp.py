@@ -325,20 +325,6 @@ def main():
             
             st.success(f"Prediction: {'High Default Risk' if prediction == 1 else 'Low Default Risk'}")
             st.info(f"Probability of Default: {probability:.1%}")
-            
-            # Show key factors
-            preprocessor = dt_model.named_steps['preprocessor']
-            features = preprocessor.transform(inp_df)
-            importances = dt_model.named_steps['classifier'].feature_importances_
-            
-            top_idx = np.argsort(importances)[::-1][:3]
-            feature_names = get_feature_names(preprocessor)
-            
-            st.write("**Key Factors in Prediction:**")
-            for idx in top_idx:
-                value = features[0, idx]
-                feat_name = feature_names[idx]
-                st.write(f"- {feat_name}: {value:.2f}")
 
 # Helper function to get feature names
 def get_feature_names(preprocessor):
